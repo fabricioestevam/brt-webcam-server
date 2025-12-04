@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: brt-webcam-server
+    env: python
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "gunicorn app:app"
+    pythonVersion: "3.11.9"
