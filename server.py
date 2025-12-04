@@ -1,38 +1,50 @@
 """
-Server v2 - BRT Recife (detecção SIMULADA)
-Recebe imagens via POST /upload (multipart/form-data, campo "imagem")
-Retorna uma linha simulada e salva no MongoDB.
+Server V2 - PADRÃO (OCR básico + OpenCV)
+Rotas:
+  - GET /            -> status
+  - GET /health      -> health JSON
+  - POST /upload     -> recebe imagem multipart ("imagem"), tenta detectar linha via OCR
+  - GET /ultimos     -> últimas leituras do MongoDB
+  - POST /deteccao/manual -> registra detecção manual (json {"linha": "437", ...})
+  - GET /previsoes/<parada> -> previsões simples para uma parada
 """
-
 from flask import Flask, request, jsonify
 from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
 from dotenv import load_dotenv
 from pathlib import Path
 import os
-import hashlib
-import random
+import io
+import re
 
-# Load .env from repo root
+# visão
+try:
+    import cv2
+    import numpy as np
+    from PIL import Image
+    import pytesseract
+    OCR_AVAILABLE = True
+except Exception:
+    OCR_AVAILABLE = False
+
+# load env
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# CONFIG
 MONGO_URI = os.getenv("MONGO_URI")
 DB_NAME = os.getenv("DB_NAME", "brt")
-DEFAULT_PORT = int(os.getenv("PORT", 10000))
+PORT = int(os.getenv("PORT", 10000))
 
 if not MONGO_URI:
     raise RuntimeError("MONGO_URI não configurado no .env")
 
-# Conexão Mongo
 client = MongoClient(MONGO_URI)
 db = client[DB_NAME]
 colecao = db["leituras"]
 
 app = Flask(__name__)
 
-# Linhas conhecidas (exemplo)
+# linhas conhecidas
 LINHAS_CONHECIDAS = {
     "437": "TI Caxangá (Conde da Boa Vista)",
     "2441": "TI CDU (Conde da Boa Vista)",
@@ -43,123 +55,130 @@ LINHAS_CONHECIDAS = {
     "820": "Linha Demonstrativa 820"
 }
 
-# Tempos por linha (minutos) usados para simulação
-TEMPO_POR_LINHA = {
-    "437": 5,
-    "2441": 6,
-    "2450": 7,
-    "2444": 4,
-    "301": 3,
-    "723": 5,
-    "820": 2
-}
-
-# Helpers
-def gerar_linha_simulada(img_bytes: bytes, override: str | None = None) -> str:
+def ocr_extract_numbers_from_image_bytes(img_bytes):
     """
-    Gera uma linha simulada:
-    - se override fornecido (simulate_line), usa ele se for conhecido
-    - senão, usa hash dos bytes para escolher consistentemente uma linha conhecida
+    Tenta extrair números do frame usando pytesseract.
+    Retorna a string de dígitos concatenados ou '' se nada.
     """
-    if override:
-        override = str(override).strip()
-        if override in LINHAS_CONHECIDAS:
-            return override
-        # aceitar só números no override
-        # se não for conhecida, retorna override mesmo assim (para demo)
-        return override
+    if not OCR_AVAILABLE:
+        return ""
+    try:
+        # carregar imagem via PIL -> cv2
+        image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        open_cv_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        gray = cv2.cvtColor(open_cv_image, cv2.COLOR_BGR2GRAY)
 
-    # hash dos bytes para resultado determinístico (a mesma imagem gera mesma linha)
+        # pequenas melhorias
+        gray = cv2.resize(gray, None, fx=1.0, fy=1.0, interpolation=cv2.INTER_LINEAR)
+        gray = cv2.GaussianBlur(gray, (3,3), 0)
+        _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+        # chamar tesseract
+        config = "--psm 6 -c tessedit_char_whitelist=0123456789"
+        text = pytesseract.image_to_string(thresh, config=config)
+        digits = "".join(re.findall(r"\d+", text))
+        return digits.strip()
+    except Exception:
+        return ""
+
+def fallback_simulate_line(img_bytes):
+    """Simples fallback: usa hash dos bytes para escolher uma linha conhecida."""
+    import hashlib, random
     h = hashlib.sha256(img_bytes).hexdigest()
     seed = int(h[:8], 16)
     random.seed(seed)
-    linhas = list(LINHAS_CONHECIDAS.keys())
-    escolhido = random.choice(linhas)
-    return escolhido
+    return random.choice(list(LINHAS_CONHECIDAS.keys()))
 
-def calcular_previsao(linha: str):
-    minutos = int(TEMPO_POR_LINHA.get(linha, 6))
+def calcular_previsao_para_linha(linha):
+    """Retorna dict com minutos estimados e horário."""
+    base_min = {
+        "437": 5, "2441": 6, "2450": 7, "2444": 4,
+        "301": 3, "723": 5, "820": 2
+    }
+    minutos = int(base_min.get(linha, 6))
     agora = datetime.now(timezone.utc)
     chegada = agora + timedelta(minutes=minutos)
-    return {
-        "linha": linha,
-        "chega_em_min": minutos,
-        "previsao_horario": chegada.isoformat()
-    }
+    return {"chega_em_min": minutos, "previsao_horario": chegada.isoformat()}
 
-# ROUTES
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({
-        "service": "BRT Webcam Server (simulado)",
-        "simulated": True,
-        "endpoints": ["/health", "/upload", "/ultimos", "/deteccao/manual", "/previsoes/<parada>"]
-    })
+    return jsonify({"service": "BRT Webcam Server", "status": "online"})
 
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
-        "status": "ok",
-        "simulated": True,
-        "mongodb": "connected" if MONGO_URI else "missing",
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "status":"online",
+        "ocr_available": OCR_AVAILABLE,
+        "mongodb": "connected"
     })
 
 @app.route("/upload", methods=["POST"])
 def upload():
     """
-    Recebe:
-      - multipart/form-data:
-        - imagem: arquivo .jpg/.png
-        - parada_origem (opcional)
-        - parada_destino (opcional)
-        - simulate_line (opcional) -> força a linha retornada (ex: 301)
-    Retorna:
-      - status, linha_detectada, nome_linha, previsao
+    Recebe multipart:
+      - imagem (arquivo)
+      - parada_origem (opcional)
+      - parada_destino (opcional)
+      - simulate_line (opcional) -> força linha (ex: 301)
     """
     try:
         if "imagem" not in request.files:
-            return jsonify({"error": "Nenhuma imagem (campo 'imagem') recebida"}), 400
+            return jsonify({"error":"Nenhuma imagem recebida (campo 'imagem')"}), 400
 
-        file = request.files["imagem"]
-        img_bytes = file.read()
-
+        f = request.files["imagem"]
+        img_bytes = f.read()
         parada_origem = request.form.get("parada_origem", "")
         parada_destino = request.form.get("parada_destino", "")
-        simulate_line = request.form.get("simulate_line")  # opcional override
+        simulate = request.form.get("simulate_line")
 
-        # Gerar linha simulada
-        linha = gerar_linha_simulada(img_bytes, override=simulate_line)
-        previsao = calcular_previsao(linha)
+        # 1) se for forcing
+        if simulate:
+            linha = str(simulate).strip()
+        else:
+            # 2) tentar OCR
+            numeros = ocr_extract_numbers_from_image_bytes(img_bytes)
+            if numeros:
+                # procurar se algum número conhecido aparece como substring (ex: '437')
+                linha = None
+                for k in LINHAS_CONHECIDAS.keys():
+                    if k in numeros:
+                        linha = k
+                        break
+                if not linha:
+                    # se numerou algo mas não bate com conhecido, usa primeiro número
+                    linha = numeros[:4]
+            else:
+                # 3) fallback
+                linha = fallback_simulate_line(img_bytes)
+
+        previsao = calcular_previsao_para_linha(linha)
 
         doc = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "parada_origem": parada_origem,
             "parada_destino": parada_destino,
             "linha_detectada": linha,
-            "nome_linha": LINHAS_CONHECIDAS.get(linha, "Linha simulada"),
+            "nome_linha": LINHAS_CONHECIDAS.get(linha, "Linha desconhecida"),
             "previsao": previsao,
             "tamanho_bytes": len(img_bytes),
-            "fonte": "webcam_simulada"
+            "fonte": "webcam_padrao"
         }
         colecao.insert_one(doc)
 
-        response_payload = {
-            "status": "success",
+        payload = {
+            "status":"success",
             "linha_detectada": linha,
             "nome_linha": doc["nome_linha"],
             "previsao": previsao
         }
-
-        # Para compatibilidade com o cliente: devolver 201 se detectou "algo"
-        return jsonify(response_payload), 201
+        return jsonify(payload), 201
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/ultimos", methods=["GET"])
 def ultimos():
-    docs = colecao.find().sort("timestamp", -1).limit(10)
+    docs = colecao.find().sort("timestamp", -1).limit(20)
     out = []
     for d in docs:
         out.append({
@@ -174,15 +193,6 @@ def ultimos():
 
 @app.route("/deteccao/manual", methods=["POST"])
 def deteccao_manual():
-    """
-    Espera JSON:
-    {
-      "linha": "437",
-      "parada_origem": "A",
-      "parada_destino": "B"
-    }
-    Registra manualmente na fila (simulação) e retorna previsão/posição.
-    """
     try:
         data = request.get_json(force=True)
         linha = str(data.get("linha", "")).strip()
@@ -190,44 +200,33 @@ def deteccao_manual():
         parada_destino = data.get("parada_destino", "")
 
         if not linha:
-            return jsonify({"error": "Campo 'linha' obrigatório"}), 400
+            return jsonify({"error":"campo 'linha' obrigatório"}), 400
 
-        previsao = calcular_previsao(linha)
+        previsao = calcular_previsao_para_linha(linha)
         agora_iso = datetime.now(timezone.utc).isoformat()
-
-        deteccao = {
+        doc = {
             "timestamp": agora_iso,
             "parada_origem": parada_origem,
             "parada_destino": parada_destino,
             "linha_detectada": linha,
-            "nome_linha": LINHAS_CONHECIDAS.get(linha, "Linha simulada"),
+            "nome_linha": LINHAS_CONHECIDAS.get(linha, "Linha desconhecida"),
             "previsao": previsao,
             "fonte": "manual"
         }
-        res = colecao.insert_one(deteccao)
-
-        # calcular posição na fila (simples): contar quantos estão 'em_rota' com mesma parada_destino
-        posicao = colecao.count_documents({
-            "parada_destino": parada_destino,
-            "linha_detectada": linha
-        })
-
+        res = colecao.insert_one(doc)
+        posicao = colecao.count_documents({"parada_destino": parada_destino, "linha_detectada": linha})
         return jsonify({
-            "status": "success",
+            "status":"success",
             "deteccao_id": str(res.inserted_id),
             "linha": linha,
             "tempo_estimado_min": previsao["chega_em_min"],
             "posicao_fila": posicao
         }), 201
-
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/previsoes/<parada_id>", methods=["GET"])
 def previsoes(parada_id):
-    """
-    Retorna previsões para uma parada (simples)
-    """
     try:
         docs = colecao.find({"parada_destino": parada_id}).sort("timestamp", 1)
         lista = []
@@ -237,15 +236,9 @@ def previsoes(parada_id):
                 "nome": d.get("nome_linha"),
                 "previsao": d.get("previsao")
             })
-        return jsonify({
-            "parada": parada_id,
-            "total": len(lista),
-            "previsoes": lista
-        })
+        return jsonify({"parada": parada_id, "total": len(lista), "previsoes": lista})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Run
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", DEFAULT_PORT))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=PORT)
