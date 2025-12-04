@@ -1,47 +1,24 @@
-import cv2
-import pytesseract
-import numpy as np
-from PIL import Image
-import io
+# utils/detector.py
+"""
+Detector SIMULADO para ambiente do Render.
+Em vez de usar IA, OCR ou modelos pesados, esta versão apenas
+simula a detecção da linha do ônibus.
 
-pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+Lógica simples:
+- Se o nome do arquivo tiver algum número => retorna esse número como linha
+- Se não tiver número => não detecta nada (retorna None)
 
-def extrair_linha_onibus(imagem_bytes):
-    """Extrai o texto do ônibus usando OCR (padrão Render Free)."""
-    
-    try:
-        img = Image.open(io.BytesIO(imagem_bytes)).convert("RGB")
-        img_np = np.array(img)
+Isso permite testar TODO O BACKEND sem processamento real.
+"""
 
-        # Preprocessamento simples
-        gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
-        blur = cv2.GaussianBlur(gray, (5, 5), 0)
-        thresh = cv2.adaptiveThreshold(
-            blur, 255,
-            cv2.ADAPTIVE_THRESH_MEAN_C,
-            cv2.THRESH_BINARY_INV, 41, 15
-        )
+def extrair_linha_onibus(img_bytes, filename="imagem.jpg"):
+    # Tenta extrair número do nome do arquivo
+    numeros = []
+    for c in filename:
+        if c.isdigit():
+            numeros.append(c)
 
-        texto = pytesseract.image_to_string(
-            thresh,
-            config="--psm 6 -c tessedit_char_whitelist=0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        )
+    if len(numeros) > 0:
+        return "".join(numeros)  # linha simulada, ex: "644"
 
-        # Filtrar apenas linhas (ex: 204, 431, 860, 243A)
-        texto = texto.strip().replace("\n", "").replace(" ", "")
-
-        if texto == "":
-            return None
-
-        # Pega apenas números/letras seguidos
-        import re
-        match = re.search(r"[0-9]{2,4}[A-Z]?", texto)
-
-        if match:
-            return match.group(0)
-
-        return None
-
-    except Exception as e:
-        print("Erro no OCR:", e)
-        return None
+    return None
