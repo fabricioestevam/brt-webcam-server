@@ -58,7 +58,7 @@ def upload():
     # --------------------------------------------------------
     # PROCESSAMENTO: DETECTAR LINHA DO ÔNIBUS
     # --------------------------------------------------------
-    linha = extrair_linha_onibus(img_bytes, file.filename)
+    linha = extrair_linha_onibus(img_bytes)
 
     if linha:
         previsao = calcular_previsao(linha)
