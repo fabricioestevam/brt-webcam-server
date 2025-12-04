@@ -3,5 +3,5 @@ pymongo==4.7.2
 python-dotenv==1.0.1
 opencv-python-headless==4.10.0.84
 pytesseract==0.3.10
-Pillow==10.2.0
+Pillow==9.5.0
 numpy==1.26.4
