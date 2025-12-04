@@ -207,3 +207,14 @@ Ajuste automático para iluminação da rua
 
 Qualquer dúvida, erros ou logs do Render → só me chamar.
 Posso até monitorar o deploy junto com você.
+
+### TESTANDO A DETECÇÃO SIMULADA (APRESENTAÇÃO)
+
+1. Execute o cliente webcam localmente (seu script) apontando `SERVIDOR_URL` para:
+   https://SEU-SERVIDOR.onrender.com
+
+2. O cliente envia a imagem para POST /upload (campo 'imagem').
+   - Opcional: enviar campo form `simulate_line=301` para forçar linha 301.
+
+3. O servidor retorna JSON com `linha_detectada` e `previsao`.
+   Use `/ultimos` para ver as últimas leituras.
