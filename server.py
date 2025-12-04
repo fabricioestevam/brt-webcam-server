@@ -1,131 +1,117 @@
 """
-Servidor Flask para detectar Ônibus com YOLO + OCR + MongoDB
-Compatível com Render e com envio de Webcam / ESP32 / Python
+Servidor BRT – Recebe imagens da webcam, processa, detecta ônibus
+e envia dados para o front.
+Compatível 100% com Render Free.
 """
 
 from flask import Flask, request, jsonify
-from flask_cors import CORS
 from datetime import datetime, timezone
 from pymongo import MongoClient
 from dotenv import load_dotenv
-from ultralytics import YOLO
-import numpy as np
-import base64
-import cv2
+from pathlib import Path
 import os
 
-# ================================
-# 🔐 CARREGAR VARIÁVEIS .ENV
-# ================================
-load_dotenv()
+# Importar utilitários
+from utils.detector import extrair_linha_onibus
+from utils.previsao import calcular_previsao
+from utils.limpeza import limpar_antigos
 
-MONGO_URI = os.getenv("MONGO_URI")
-DB_NAME = os.getenv("DB_NAME", "brt_db")
+# Carregar .env
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
-if not MONGO_URI:
-    raise RuntimeError("❌ ERRO: MONGO_URI não encontrada no .env")
-
-# ================================
-# 🔧 MONGO
-# ================================
-client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
-collection = db["deteccoes"]
-
-# ================================
-# 🤖 CARREGAR MODELO YOLO
-# ================================
-model = YOLO("yolov8n.pt")  # pequeno mas rápido
-
-# ================================
-# 🌐 FLASK
-# ================================
 app = Flask(__name__)
-CORS(app)
 
-# ================================
-#   HEALTH CHECK
-# ================================
-@app.route("/health", methods=["GET"])
+# MongoDB
+MONGO_URI = os.getenv("MONGO_URI")
+DB_NAME = os.getenv("DB_NAME")
+
+mongo = MongoClient(MONGO_URI)
+db = mongo[DB_NAME]
+col = db["leituras"]
+
+
+# ------------------------------------------------------------
+# HEALTH CHECK
+# ------------------------------------------------------------
+@app.route("/")
+def home():
+    return {"status": "online", "service": "BRT Webcam Server"}
+
+
+@app.route("/health")
 def health():
-    return jsonify({
-        "status": "online",
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    })
+    return {"status": "ok"}
 
 
-# ================================
-#   ENDPOINT /upload
-# ================================
+# ------------------------------------------------------------
+# RECEBER IMAGENS DA WEBCAM
+# ------------------------------------------------------------
 @app.route("/upload", methods=["POST"])
-def upload_image():
-    try:
-        if "imagem" not in request.files:
-            return jsonify({"error": "Nenhuma imagem recebida"}), 400
+def upload():
+    if "imagem" not in request.files:
+        return {"error": "nenhuma imagem recebida"}, 400
 
-        file = request.files["imagem"]
-        img_bytes = file.read()
+    file = request.files["imagem"]
+    img_bytes = file.read()
 
-        # Converter para matriz (OpenCV)
-        np_arr = np.frombuffer(img_bytes, np.uint8)
-        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    # --------------------------------------------------------
+    # PROCESSAMENTO: DETECTAR LINHA DO ÔNIBUS
+    # --------------------------------------------------------
+    linha = extrair_linha_onibus(img_bytes)
 
-        if frame is None:
-            return jsonify({"error": "Imagem inválida"}), 400
+    if linha:
+        previsao = calcular_previsao(linha)
+    else:
+        previsao = None
 
-        # ===========================
-        #  🚌 RODAR YOLO
-        # ===========================
-        results = model(frame, stream=False)
-        bus_detected = False
+    doc = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp_datetime": datetime.now(timezone.utc),
+        "linha_detectada": linha,
+        "previsao": previsao,
+        "tamanho_bytes": len(img_bytes)
+    }
 
-        for r in results:
-            for box in r.boxes:
-                cls = int(box.cls)
-                label = model.names[cls]
+    col.insert_one(doc)
 
-                if label.lower() in ["bus", "truck", "coach"]:
-                    bus_detected = True
-
-        # ===========================
-        #  SALVAR NO BANCO
-        # ===========================
-        doc = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "bus_detected": bus_detected,
-            "raw_image_base64": base64.b64encode(img_bytes).decode("utf-8")
-        }
-
-        collection.insert_one(doc)
-
-        return jsonify({
-            "status": "ok",
-            "bus_detected": bus_detected
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return {
+        "status": "ok",
+        "linha": linha,
+        "previsao": previsao
+    }
 
 
-# ================================
-#   /ultimos — usado no front
-# ================================
-@app.route("/ultimos", methods=["GET"])
+# ------------------------------------------------------------
+# LISTAR ÚLTIMAS LEITURAS
+# ------------------------------------------------------------
+@app.route("/ultimos")
 def ultimos():
-    docs = collection.find().sort("timestamp", -1).limit(20)
+    docs = col.find().sort("timestamp_datetime", -1).limit(10)
 
-    saida = []
+    dados = []
     for d in docs:
-        saida.append({
+        dados.append({
             "timestamp": d["timestamp"],
-            "bus_detected": d["bus_detected"]
+            "linha_detectada": d["linha_detectada"],
+            "previsao": d["previsao"]
         })
 
-    return jsonify(saida)
+    return dados
 
 
-# ================================
-#   MAIN LOCAL
-# ================================
+# ------------------------------------------------------------
+# LIMPEZA AUTOMÁTICA (manual)
+# ------------------------------------------------------------
+@app.route("/limpar")
+def limpar():
+    limpar_antigos(col)
+    return {"status": "limpo"}
+
+
+# ------------------------------------------------------------
+# MAIN
+# ------------------------------------------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    PORT = int(os.getenv("PORT", 5000))
+    app.run(host="0.0.0.0", port=PORT)
