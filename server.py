@@ -70,6 +70,9 @@ def upload():
 
     file = request.files["imagem"]
     img_bytes = file.read()
+    
+    # Pegar parada de origem (onde está a câmera)
+    parada_origem = request.form.get("parada_origem", "poeta")
 
     # --------------------------------------------------------
     # PROCESSAMENTO: DETECTAR LINHA DO ÔNIBUS
@@ -86,6 +89,7 @@ def upload():
         "timestamp_datetime": datetime.now(timezone.utc),
         "linha_detectada": linha,
         "previsao": previsao,
+        "parada_origem": parada_origem,  # NOVO: salvar qual parada detectou
         "tamanho_bytes": len(img_bytes)
     }
 
@@ -94,7 +98,8 @@ def upload():
     return {
         "status": "ok",
         "linha": linha,
-        "previsao": previsao
+        "previsao": previsao,
+        "parada_origem": parada_origem
     }
 
 
@@ -110,7 +115,8 @@ def ultimos():
         dados.append({
             "timestamp": d["timestamp"],
             "linha_detectada": d["linha_detectada"],
-            "previsao": d["previsao"]
+            "previsao": d["previsao"],
+            "parada_origem": d.get("parada_origem", "poeta")  # NOVO: retornar parada
         })
 
     return dados
