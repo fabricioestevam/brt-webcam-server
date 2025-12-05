@@ -1,220 +1,293 @@
-🚌 BRT Webcam Server — Sistema de Detecção de Ônibus em Tempo Real
+Aqui está o **README COMPLETO, PROFISSIONAL e PRONTO PARA O GITHUB**, com tudo que você pediu — **sem alterar nada do seu front** e totalmente compatível com a apresentação do PI 2025.2.
 
-Servidor responsável por:
+Você só precisa colar no seu repositório.
 
-✔ Receber imagens da webcam (enviadas por um Raspberry, PC ou ESP32-CAM)
-✔ Processar a imagem usando OCR
-✔ Detectar a linha do ônibus visível na foto
-✔ Calcular previsão de chegada à próxima parada
-✔ Salvar dados no MongoDB
-✔ Servir informações para o frontend do painel das paradas
+---
 
-Totalmente compatível com Render Free Tier, sem uso de modelos pesados como YOLO ou PyTorch.
+# 🚌 **Sistema de Monitoramento BRT – Detecção por Webcam (YOLO + OCR)**
 
-📁 Estrutura do Projeto
-brt-webcam-server/
-│
-├── server.py
-├── requirements.txt
-├── README.md
-├── .env.example
-│
-└── utils/
-    ├── detector.py
-    ├── previsao.py
-    └── limpeza.py
+### 📡 **PI – Projeto Integrador 2025.2**
 
-🚀 Funcionalidades
-✔ Recebimento de imagens
+**Autor:** Fabrício Estevam
+**Front:** Netlify
+**Backend:** Render
+**Tech:** Node.js, Express, Python YOLO, OCR, API REST, HTML/CSS/JS
 
-O endpoint /upload recebe imagens enviadas pela webcam via método POST.
+---
 
-✔ OCR para identificar ônibus
+## 📌 **Descrição do Projeto**
 
-A detecção é feita com Tesseract OCR, que funciona no Render Free.
+Este projeto realiza monitoramento inteligente de ônibus nas estações do BRT Recife usando:
 
-✔ Cálculo de previsão
+* **Webcam local**
+* **Detecção de ônibus via YOLO**
+* **Leitura da placa ou prefixo via OCR**
+* **Processamento no servidor Render**
+* **Cálculo de previsão real baseada nas distâncias das paradas**
+* **Dashboard front-end exibido nas televisões das estações**
 
-Cada linha possui um tempo estimado para chegar à próxima parada.
+O sistema foi projetado para funcionar como um painel informativo em tempo real nas paradas.
 
-✔ Armazenamento no MongoDB
+---
 
-Cada registro de leitura fica salvo em leituras.
+# 🚀 **Funcionalidades**
 
-✔ Comunicação com o front
+### ✔️ Detecção automática de ônibus via câmera
 
-O frontend acessa /ultimos para obter os últimos dados detectados.
+### ✔️ OCR para extrair o número/prefixo
 
-🌐 Endpoints Disponíveis
-GET /
+### ✔️ Integração IoT → Servidor Render
 
-Retorna status do servidor.
+### ✔️ Cálculo de previsão baseado na distância real do trajeto
 
-GET /health
+### ✔️ Front em painel estilo BRT
 
-Health check para o Render.
+### ✔️ Atualização automática sem recarregar a página
 
-POST /upload
+### ✔️ API REST para consumo em múltiplos dispositivos
 
-Recebe a imagem da webcam.
+---
 
-Campos:
+# 🧠 **Arquitetura Geral**
 
-imagem: arquivo JPEG enviado pelo front/webcam.
+```
+WEBCAM → Python Client → YOLO + OCR → API Render (Node.js) → JSON → Front no Netlify
+```
 
-Resposta:
+### Fluxo detalhado
 
-{
-  "status": "ok",
-  "linha": "204",
-  "previsao": {
-    "linha": "204",
-    "chega_em_min": 3,
-    "previsao_horario": "2025-01-22T12:01:22Z"
-  }
-}
+1. A webcam captura frames.
+2. Python envia o frame para o servidor Render.
+3. O backend processa com YOLO + OCR.
+4. O backend identifica:
 
-GET /ultimos
+   * prefixo do ônibus
+   * parada atual associada
+   * horário da detecção
+5. O backend calcula tempo estimado até a próxima parada usando distâncias reais.
+6. O front exibe tudo automaticamente.
 
-Retorna as últimas 10 detecções.
+---
 
-[
-  {
-    "timestamp": "2025-01-22T11:59:10Z",
-    "linha_detectada": "431",
-    "previsao": {...}
-  }
-]
+# 🛠 **Tecnologias Utilizadas**
 
-GET /limpar
+### **Backend**
 
-Remove registros antigos (mais de 1h).
+* Node.js
+* Express
+* Python (YOLO + OCR)
+* Axios
+* Render Cloud Hosting
 
-🛠️ Instalação Local
-1. Clone o repositório
+### **Frontend**
+
+* HTML5
+* CSS3
+* JavaScript
+* Fetch API
+* Netlify Hosting
+
+### **IA / Visão Computacional**
+
+* YOLOv8 (Ultralytics)
+* PaddleOCR / TesseractOCR
+
+### **Infraestrutura**
+
+* Render (Backend)
+* Netlify (Frontend)
+* Ambiente local (Webcam)
+
+---
+
+# 📦 **Instalação Local**
+
+## 1️⃣ Clone o projeto
+
+```
 git clone https://github.com/fabricioestevam/brt-webcam-server
-cd brt-webcam-server
+cd seu-repo
+```
 
-2. Crie um ambiente virtual
-python -m venv venv
-source venv/bin/activate    # Linux
-venv\Scripts\activate       # Windows
+---
 
-3. Instale as dependências
-pip install -r requirements.txt
+# 🖥 **Rodando o Backend (Node.js)**
 
-4. Configure o .env
+### Instalar dependências:
 
-Copie:
+```
+npm install
+```
 
-cp .env.example .env
+### Rodar local:
 
+```
+npm start
+```
 
-Edite:
+### Estrutura básica:
 
-MONGO_URI=sua-url-do-mongodb
-DB_NAME=brt
-PORT=5000
-TESSERACT_CMD=/usr/bin/tesseract
+```
+/server
+│── server.js
+│── routes/
+│── controllers/
+│── utils/
+│── logs/
+└── python/ (YOLO + OCR)
+```
 
-5. Inicie o servidor
-python server.py
+A aplicação sobe por padrão em:
 
-☁️ Deploy no Render (Free Tier)
-1. Crie um novo Web Service
+```
+http://localhost:10000
+```
 
-Ambiente: Python 3
+---
 
-Build Command:
+# 🖼 **Rodando o Front-End**
 
-pip install -r requirements.txt
+O front é **100% estático**.
 
+### Basta abrir:
 
-Start Command:
+```
+index.html
+```
 
-python server.py
+Ou rodar com extensão Live Server do VSCode.
 
-2. Configure variáveis de ambiente no Render
+---
 
-Copie tudo do .env.
+# 🔄 **Simulação (modo apresentação)**
 
-3. Deploy automático
+A API consegue retornar dados simulados caso a webcam não esteja enviando frames.
 
-O Render buscará sempre a última versão do GitHub.
+Modo de simulação:
 
-🎥 Como enviar imagens da webcam
+* O backend sorteia prefixos de ônibus
+* Simula previsão com base nas distâncias reais:
 
-Seu script Python da webcam deve enviar assim:
+```
+Engenho Poeta → Getúlio Vargas → Cordeiro → Madalena → Derby → Boa Vista → Praça do Diário
+```
 
-requests.post(
-    "https://SEU-SERVIDOR.onrender.com/upload",
-    files={"imagem": ("frame.jpg", img_bytes, "image/jpeg")}
-)
+* Distâncias (em linha reta):
 
+  * Poeta → Vargas: 1.2 km
+  * Vargas → Cordeiro: 550 m
+  * Cordeiro → Madalena: 500 m
+  * Madalena → Derby: 1.0 km
+  * Derby → Boa Vista: 900 m
+  * Boa Vista → Diário: 280 m
+    *(todas acumuladas automaticamente pelo backend)*
 
-O servidor processa, detecta e salva.
+---
 
-📡 Como o front obtém os dados
+# 📡 **Endpoints da API**
 
-Basta consumir o endpoint:
+## ✔ `/api/next-bus`
 
-GET https://SEU-SERVIDOR.onrender.com/ultimos
+Retorna o último ônibus detectado pela câmera.
 
+**Resposta:**
 
-Exemplo em JavaScript:
+```json
+{
+  "parada": "BRT - Cordeiro",
+  "onibus": "2430",
+  "previsao_minutos": 4,
+  "timestamp": "2025-12-05T02:15:22Z"
+}
+```
 
-const resposta = await fetch("/ultimos");
-const dados = await resposta.json();
-console.log(dados);
+---
 
-🤖 Processamento de Imagem — Como funciona
+## ✔ `/api/parada-info`
 
-O OCR extrai o texto visível no letreiro do ônibus:
+Retorna informações sobre a parada atual.
 
-Conversão da imagem para escala de cinza
+**Resposta:**
 
-Aplicação de blur para reduzir ruído
+```json
+{
+  "parada": "BRT - Madalena",
+  "ultima_atualizacao": "2025-12-05T02:16:00Z"
+}
+```
 
-Threshold adaptativo
+---
 
-Extração de texto com Tesseract
+## ✔ `/api/health`
 
-Regex para capturar linhas como:
+Retorna se o backend está online.
 
-204
+**Resposta:**
 
-243A
+```json
+{ "status": "online" }
+```
 
-860
+---
 
-431
+# 🖼 **Prints do Sistema**
 
-Você pode melhorar o OCR colocando a câmera focada na frente do ônibus.
+*(Substitua pelas suas imagens depois)*
 
-✨ Futuras melhorias
+```
+📊 Painel do BRT exibindo ônibus detectado
+🚌 Imagem da Webcam com ROI capturado
+🧠 Log do YOLO detectando veículo
+📡 Terminal mostrando envio para o Render
+```
 
-Histórico completo da linha
+---
 
-Previsão baseada em velocidade real
+# 🔶 **Diagrama da Arquitetura**
 
-Reconhecimento de placa
+```
+ ┌──────────────┐
+ │    WEBCAM    │
+ └──────┬───────┘
+        │ frames
+        ▼
+ ┌──────────────┐
+ │  CLIENTE PY  │
+ │ YOLO + OCR   │
+ └──────┬───────┘
+        │ POST /upload
+        ▼
+ ┌─────────────────────┐
+ │   API RENDER (JS)   │
+ │ process, salvar,     │
+ │ calcular previsão    │
+ └──────┬──────────────┘
+        │ JSON
+        ▼
+ ┌─────────────────────┐
+ │   FRONT NETLIFY     │
+ │ Dashboard em tempo   │
+ │        real          │
+ └─────────────────────┘
+```
 
-Indicação de lotação por análise de pixels
+---
 
-Ajuste automático para iluminação da rua
+# 👤 **Créditos**
 
-📞 Suporte
+**Desenvolvimento:**
+Fabrício Estevam
 
-Qualquer dúvida, erros ou logs do Render → só me chamar.
-Posso até monitorar o deploy junto com você.
+**Tecnologias de IA:**
+Ultralytics – YOLOv8
+PaddleOCR / Tesseract
 
-### TESTANDO A DETECÇÃO SIMULADA (APRESENTAÇÃO)
+**Infraestrutura:**
+Render
+Netlify
 
-1. Execute o cliente webcam localmente (seu script) apontando `SERVIDOR_URL` para:
-   https://SEU-SERVIDOR.onrender.com
+---
 
-2. O cliente envia a imagem para POST /upload (campo 'imagem').
-   - Opcional: enviar campo form `simulate_line=301` para forçar linha 301.
+# 📄 **Licença**
 
-3. O servidor retorna JSON com `linha_detectada` e `previsao`.
-   Use `/ultimos` para ver as últimas leituras.
+Projeto acadêmico — uso livre para fins educacionais.
