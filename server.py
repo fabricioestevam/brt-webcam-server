@@ -86,7 +86,7 @@ def upload():
         "timestamp_datetime": datetime.now(timezone.utc),
         "linha_detectada": linha,
         "previsao": previsao,
-        "parada_origem": parada_origem,  # NOVO: salvar qual parada detectou
+        "parada_origem": parada_origem,  
         "tamanho_bytes": len(img_bytes)
     }
 
@@ -112,7 +112,7 @@ def ultimos():
             "timestamp": d["timestamp"],
             "linha_detectada": d["linha_detectada"],
             "previsao": d["previsao"],
-            "parada_origem": d.get("parada_origem", "poeta")  # NOVO: retornar parada
+            "parada_origem": d.get("parada_origem", "poeta")  
         })
 
     return dados
