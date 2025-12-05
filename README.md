@@ -253,15 +253,15 @@ Retorna se o backend está online.
         ▼
  ┌─────────────────────┐
  │   API RENDER (JS)   │
- │ process, salvar,     │
- │ calcular previsão    │
+ │ process, salvar,    │
+ │ calcular previsão   │
  └──────┬──────────────┘
         │ JSON
         ▼
  ┌─────────────────────┐
  │   FRONT NETLIFY     │
- │ Dashboard em tempo   │
- │        real          │
+ │ Dashboard em tempo  │
+ │        real         │
  └─────────────────────┘
 ```
 
@@ -270,7 +270,11 @@ Retorna se o backend está online.
 # 👤 **Créditos**
 
 **Desenvolvimento:**
-Fabrício Estevam
+Ezaú felipe
+Fabricio Estevam
+Gustavo José
+Jenifer Mayara
+Maria da Penha
 
 **Tecnologias de IA:**
 Ultralytics – YOLOv8
