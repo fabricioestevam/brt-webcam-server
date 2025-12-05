@@ -1,9 +1,3 @@
-Aqui está o **README COMPLETO, PROFISSIONAL e PRONTO PARA O GITHUB**, com tudo que você pediu — **sem alterar nada do seu front** e totalmente compatível com a apresentação do PI 2025.2.
-
-Você só precisa colar no seu repositório.
-
----
-
 # 🚌 **Sistema de Monitoramento BRT – Detecção por Webcam (YOLO + OCR)**
 
 ### 📡 **PI – Projeto Integrador 2025.2**
