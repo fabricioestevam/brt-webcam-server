@@ -12,7 +12,7 @@ import requests
 # CONFIGURAÇÃO
 # --------------------------------------------
 IMAGES_FOLDER = "simulacao_webcam"  # pasta com imagens simulando webcam
-UPLOAD_URL = "https://brt-webcam-server.onrender.com"  
+UPLOAD_URL = "https://brt-webcam.onrender.com/upload"  
 PARADA_ORIGEM = "simulacao"  # nome da parada para simulação
 SLEEP_TIME = 1  # segundos entre cada envio (simula frame da webcam)
 
