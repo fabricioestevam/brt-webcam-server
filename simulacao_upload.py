@@ -12,17 +12,21 @@ import requests
 # CONFIGURAÇÃO
 # --------------------------------------------
 IMAGES_FOLDER = "simulacao_webcam"  # pasta com imagens simulando webcam
-UPLOAD_URL = "https://brt-webcam.onrender.com/upload"  
+UPLOAD_URL = "https://brt-webcam.onrender.com/upload"  # substitua pelo seu app Render
 PARADA_ORIGEM = "simulacao"  # nome da parada para simulação
 SLEEP_TIME = 1  # segundos entre cada envio (simula frame da webcam)
 
 # --------------------------------------------
 # LISTAR IMAGENS
 # --------------------------------------------
+if not os.path.exists(IMAGES_FOLDER):
+    print(f"Pasta '{IMAGES_FOLDER}' não encontrada!")
+    exit()
+
 images = sorted([f for f in os.listdir(IMAGES_FOLDER) if f.lower().endswith((".jpg", ".png"))])
 
 if not images:
-    print("Nenhuma imagem encontrada na pasta simulacao_webcam")
+    print(f"Nenhuma imagem encontrada na pasta '{IMAGES_FOLDER}'")
     exit()
 
 # --------------------------------------------
@@ -31,6 +35,10 @@ if not images:
 for img_file in images:
     img_path = os.path.join(IMAGES_FOLDER, img_file)
     
+    if not os.path.isfile(img_path):
+        print(f"[PULAR] Arquivo não encontrado: {img_file}")
+        continue
+
     with open(img_path, "rb") as f:
         files = {"imagem": f}
         data = {"parada_origem": PARADA_ORIGEM}
