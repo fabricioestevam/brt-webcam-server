@@ -1,7 +1,6 @@
 """
 Servidor BRT – Recebe imagens da webcam, processa, detecta ônibus
 e envia dados para o front.
-Compatível 100% com Render Free.
 """
 
 from flask import Flask, request, jsonify
@@ -11,6 +10,7 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 from pathlib import Path
 import os
+import time
 
 # Importar utilitários
 from utils.detector import extrair_linha_onibus
@@ -46,7 +46,6 @@ mongo = MongoClient(MONGO_URI)
 db = mongo[DB_NAME]
 col = db["leituras"]
 
-
 # ------------------------------------------------------------
 # HEALTH CHECK
 # ------------------------------------------------------------
@@ -54,11 +53,9 @@ col = db["leituras"]
 def home():
     return {"status": "online", "service": "BRT Webcam Server"}
 
-
 @app.route("/health")
 def health():
     return {"status": "ok"}
-
 
 # ------------------------------------------------------------
 # RECEBER IMAGENS DA WEBCAM
@@ -102,7 +99,6 @@ def upload():
         "parada_origem": parada_origem
     }
 
-
 # ------------------------------------------------------------
 # LISTAR ÚLTIMAS LEITURAS
 # ------------------------------------------------------------
@@ -121,7 +117,6 @@ def ultimos():
 
     return dados
 
-
 # ------------------------------------------------------------
 # LIMPEZA AUTOMÁTICA (manual)
 # ------------------------------------------------------------
@@ -130,6 +125,56 @@ def limpar():
     limpar_antigos(col)
     return {"status": "limpo"}
 
+# ------------------------------------------------------------
+# SIMULAÇÃO DE WEBCAM (para Render Free)
+# ------------------------------------------------------------
+@app.route("/simulacao_webcam")
+def simulacao_webcam():
+    # Pasta com imagens simulando a webcam
+    IMAGES_FOLDER = Path(__file__).parent / "simulacao_webcam"
+    if not IMAGES_FOLDER.exists():
+        return {"error": "Pasta simulacao_webcam não encontrada"}, 400
+
+    images = sorted([f for f in os.listdir(IMAGES_FOLDER) if f.lower().endswith((".jpg", ".png"))])
+    resultados = []
+
+    for img_file in images:
+        img_path = IMAGES_FOLDER / img_file
+        with open(img_path, "rb") as f:
+            img_bytes = f.read()
+
+        # Simular parada de origem
+        parada_origem = "simulacao"
+
+        # PROCESSAMENTO: DETECTAR LINHA DO ÔNIBUS
+        linha = extrair_linha_onibus(img_bytes, img_file)
+        if linha:
+            previsao = calcular_previsao(linha)
+        else:
+            previsao = None
+
+        # Salvar no Mongo (igual upload normal)
+        doc = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp_datetime": datetime.now(timezone.utc),
+            "linha_detectada": linha,
+            "previsao": previsao,
+            "parada_origem": parada_origem,
+            "tamanho_bytes": len(img_bytes)
+        }
+        col.insert_one(doc)
+
+        resultados.append({
+            "imagem": img_file,
+            "linha_detectada": linha,
+            "previsao": previsao,
+            "parada_origem": parada_origem
+        })
+
+        # Pausa de 1s para simular frame de webcam
+        time.sleep(1)
+
+    return jsonify(resultados)
 
 # ------------------------------------------------------------
 # MAIN
