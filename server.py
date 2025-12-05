@@ -5,6 +5,7 @@ Compatível 100% com Render Free.
 """
 
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from datetime import datetime, timezone
 from pymongo import MongoClient
 from dotenv import load_dotenv
@@ -21,6 +22,21 @@ env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
 app = Flask(__name__)
+
+# ============================================================
+# CONFIGURAR CORS - PERMITIR NETLIFY
+# ============================================================
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "https://frontpi.netlify.app",
+            "http://localhost:*",
+            "http://127.0.0.1:*"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Accept"]
+    }
+})
 
 # MongoDB
 MONGO_URI = os.getenv("MONGO_URI")
@@ -58,8 +74,7 @@ def upload():
     # --------------------------------------------------------
     # PROCESSAMENTO: DETECTAR LINHA DO ÔNIBUS
     # --------------------------------------------------------
-    linha = extrair_linha_olinha = extrair_linha_onibus(img_bytes, file.filename)
-
+    linha = extrair_linha_onibus(img_bytes, file.filename)
 
     if linha:
         previsao = calcular_previsao(linha)
