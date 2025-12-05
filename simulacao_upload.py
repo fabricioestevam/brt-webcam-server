@@ -1,0 +1,50 @@
+"""
+Script de Simulação de Webcam para Render Free
+Envia imagens da pasta 'simulacao_webcam' para o endpoint /upload do servidor.
+Compatível com front existente.
+"""
+
+import os
+import time
+import requests
+
+# --------------------------------------------
+# CONFIGURAÇÃO
+# --------------------------------------------
+IMAGES_FOLDER = "simulacao_webcam"  # pasta com imagens simulando webcam
+UPLOAD_URL = "https://<seu-app-render>.onrender.com/upload"  # substitua pela URL do seu app
+PARADA_ORIGEM = "simulacao"  # nome da parada para simulação
+SLEEP_TIME = 1  # segundos entre cada envio (simula frame da webcam)
+
+# --------------------------------------------
+# LISTAR IMAGENS
+# --------------------------------------------
+images = sorted([f for f in os.listdir(IMAGES_FOLDER) if f.lower().endswith((".jpg", ".png"))])
+
+if not images:
+    print("Nenhuma imagem encontrada na pasta simulacao_webcam")
+    exit()
+
+# --------------------------------------------
+# ENVIAR IMAGENS PARA O SERVIDOR
+# --------------------------------------------
+for img_file in images:
+    img_path = os.path.join(IMAGES_FOLDER, img_file)
+    
+    with open(img_path, "rb") as f:
+        files = {"imagem": f}
+        data = {"parada_origem": PARADA_ORIGEM}
+
+        try:
+            response = requests.post(UPLOAD_URL, files=files, data=data, timeout=10)
+            if response.status_code == 200:
+                print(f"[OK] {img_file} → {response.json()}")
+            else:
+                print(f"[ERRO] {img_file} → Status {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"[EXCEÇÃO] Falha ao enviar {img_file}: {e}")
+
+    # Pausa entre imagens para simular frames da webcam
+    time.sleep(SLEEP_TIME)
+
+print("Simulação concluída!")
